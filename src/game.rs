@@ -6,10 +6,17 @@ use winit::event::VirtualKeyCode;
 
 use crate::renderer::Renderer;
 
+pub enum State {
+    Ok,
+    Win,
+    Lost,
+}
+
 pub struct Game {
     snake: Snake,
     food: Food,
     rect: Size,
+    state: State,
 }
 
 impl Game {
@@ -20,6 +27,7 @@ impl Game {
             snake: Snake::new(head),
             food: Food::new(head),
             rect: Size::new(w, h),
+            state: State::Ok,
         }
     }
 
@@ -47,11 +55,19 @@ impl Game {
         self.food.render(renderer);
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self) -> State {
         let next_head = self.snake.next_head();
 
-        if next_head.x < 0 || next_head.x >= self.rect.w || next_head.y < 0 || next_head.y >= self.rect.h {
-            return
+        if next_head.x < 0
+            || next_head.x >= self.rect.w
+            || next_head.y < 0
+            || next_head.y >= self.rect.h
+        {
+            return State::Lost;
+        }
+
+        if self.snake.hit_test(&next_head) {
+            return State::Lost;
         }
 
         if next_head == self.food.pos {
@@ -60,6 +76,8 @@ impl Game {
         } else {
             self.snake.step(next_head);
         }
+
+        State::Ok
     }
 
     pub fn on_key(&mut self, key: VirtualKeyCode) {
@@ -97,34 +115,24 @@ impl Snake {
     fn next_head(&self) -> Point {
         let head = self.body.front().unwrap();
 
-        let new_head;
-
-        match self.direction {
-            Direction::Up => {
-                new_head = Point::new(head.x, head.y-1);
-            }
-            Direction::Down => {
-                new_head = Point::new(head.x, head.y+1);
-            }
-            Direction::Left => {
-                new_head = Point::new(head.x-1, head.y);
-            }
-            Direction::Right => {
-                new_head = Point::new(head.x+1, head.y);
-            }
+         match self.direction {
+            Direction::Up => Point::new(head.x, head.y - 1),
+            Direction::Down => Point::new(head.x, head.y + 1),
+            Direction::Left => Point::new(head.x - 1, head.y),
+            Direction::Right => Point::new(head.x + 1, head.y),
         }
 
-        new_head
+        
     }
 
     fn hit_test(&self, p: &Point) -> bool {
         for b in &self.body {
-            if b.is_same(&p) {
+            if b.is_same(p) {
                 return true;
             }
         }
 
-        return false;
+        false
     }
 
     fn render(&self, renderer: &mut impl Renderer) {
@@ -165,7 +173,7 @@ enum Direction {
     Up = 0x00,
     Down = 0x01,
     Left = 0x10,
-    Right = 011,
+    Right = 0x11,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

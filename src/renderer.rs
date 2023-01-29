@@ -3,7 +3,7 @@ use tiny_skia::{Color, Paint, Pixmap, Rect, Transform};
 use crate::game::Point;
 
 pub trait Renderer {
-    fn draw_points<'a>(&mut self, points: impl Iterator<Item=&'a Point>, color: Color);
+    fn draw_points<'a>(&mut self, points: impl Iterator<Item = &'a Point>, color: Color);
 
     fn render(&self, buffer: &mut [u32]);
 
@@ -25,7 +25,7 @@ impl SkiaRenderer {
 }
 
 impl Renderer for SkiaRenderer {
-    fn draw_points<'a>(&mut self, points: impl Iterator<Item=&'a Point>, color: Color) {
+    fn draw_points<'a>(&mut self, points: impl Iterator<Item = &'a Point>, color: Color) {
         let mut paint = Paint::default();
         paint.set_color(color);
 

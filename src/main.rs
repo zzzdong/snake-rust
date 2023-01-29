@@ -5,15 +5,15 @@ use std::time::{Duration, Instant};
 
 use softbuffer::GraphicsContext;
 use winit::dpi::PhysicalSize;
-use winit::event::{Event, KeyboardInput, WindowEvent};
-use winit::event_loop::{ EventLoop};
+use winit::event::{Event, VirtualKeyCode, WindowEvent};
+use winit::event_loop::EventLoop;
 use winit::window::WindowBuilder;
 
 use crate::game::Game;
 use crate::renderer::{Renderer, SkiaRenderer};
 
-const WIDTH: i32 = 48;
-const HEIGHT: i32 = 48;
+const WIDTH: i32 = 24;
+const HEIGHT: i32 = 24;
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -39,70 +39,65 @@ fn main() {
 
     let mut skia_renderer = SkiaRenderer::new(width, height, scale as f32);
 
-    let mut buffer = vec![0; (width * height) as usize];
+    let mut frame_buffer = vec![0; (width * height) as usize];
 
     let mut last_frame = Instant::now();
     let mut ticker = Instant::now();
+    let mut key_events: Vec<VirtualKeyCode> = Vec::new();
+
+    const SIM_DT: f32 = 1.0 / 60.0;
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_poll();
 
         match event {
             Event::RedrawRequested(window_id) if window_id == window.id() => {
-                if last_frame.elapsed() > Duration::from_millis(30) {
+                let elapsed = last_frame.elapsed().as_secs_f32();
+
+                if elapsed >= SIM_DT {
                     let renderer = &mut skia_renderer;
 
                     renderer.clear();
 
                     game.render(renderer);
 
-                    renderer.render(&mut buffer);
+                    renderer.render(&mut frame_buffer);
 
-                    graphics_context.set_buffer(&buffer, width as u16, height as u16);
-
+                    graphics_context.set_buffer(&frame_buffer, width as u16, height as u16);
                     last_frame = Instant::now();
                 }
             }
 
             Event::MainEventsCleared => {
-                window.request_redraw();
-
                 if ticker.elapsed() > Duration::from_millis(100) {
                     game.tick();
 
                     ticker = Instant::now();
                 }
+
+                for key in key_events.iter() {
+                    game.on_key(*key);
+                }
+
+                key_events.clear();
+
+                window.request_redraw();
             }
 
-            Event::WindowEvent {
-                window_id,
-                event:
-                    WindowEvent::KeyboardInput {
-                        input:
-                            KeyboardInput {
-                                virtual_keycode: Some(virtual_code),
-                                ..
-                            },
-                        ..
-                    },
-            } => if window_id == window.id() {
-                match virtual_code {
-                    winit::event::VirtualKeyCode::Q | winit::event::VirtualKeyCode::Escape => {
-                        control_flow.set_exit()
-                    }
-                    _ => {
-                        game.on_key(virtual_code);
+            Event::WindowEvent { event, window_id } if window_id == window.id() => match &event {
+                WindowEvent::CloseRequested => control_flow.set_exit(),
+                WindowEvent::KeyboardInput { input, .. } => {
+                    if let Some(key) = input.virtual_keycode {
+                        match key {
+                            VirtualKeyCode::Q | VirtualKeyCode::Escape => control_flow.set_exit(),
+                            _ => {
+                                key_events.push(key);
+                            }
+                        }
                     }
                 }
-                
-            }
-
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id,
-            } if window_id == window.id() => {
-                control_flow.set_exit()
-            }
+                _ => {}
+            },
             Event::WindowEvent {
                 event: WindowEvent::Resized(_),
                 window_id,
