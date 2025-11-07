@@ -1,6 +1,6 @@
 use tiny_skia::{Color, Paint, Pixmap, Rect, Transform};
 
-use crate::game::Point;
+use crate::app::Point;
 
 pub trait Renderer {
     fn draw_points<'a>(&mut self, points: impl Iterator<Item = &'a Point>, color: Color);

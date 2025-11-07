@@ -2,21 +2,15 @@ use std::collections::VecDeque;
 
 use rand::Rng;
 use tiny_skia::Color;
-use winit::event::VirtualKeyCode;
+use winit::keyboard::KeyCode;
 
+use crate::app::{End, Point, Size, State};
 use crate::renderer::Renderer;
-
-pub enum State {
-    Ok,
-    Win,
-    Lost,
-}
 
 pub struct Game {
     snake: Snake,
     food: Food,
     rect: Size,
-    state: State,
 }
 
 impl Game {
@@ -27,7 +21,6 @@ impl Game {
             snake: Snake::new(head),
             food: Food::new(head),
             rect: Size::new(w, h),
-            state: State::Ok,
         }
     }
 
@@ -37,8 +30,8 @@ impl Game {
 
     fn place_food(&mut self) {
         loop {
-            let x = rand::thread_rng().gen_range(0..self.rect.w);
-            let y = rand::thread_rng().gen_range(0..self.rect.h);
+            let x = rand::rng().random_range(0..self.rect.width());
+            let y = rand::rng().random_range(0..self.rect.height());
 
             let p = Point::new(x, y);
 
@@ -59,15 +52,15 @@ impl Game {
         let next_head = self.snake.next_head();
 
         if next_head.x < 0
-            || next_head.x >= self.rect.w
+            || next_head.x >= self.rect.width()
             || next_head.y < 0
-            || next_head.y >= self.rect.h
+            || next_head.y >= self.rect.height()
         {
-            return State::Lost;
+            return State::End(End::Lost);
         }
 
         if self.snake.hit_test(&next_head) {
-            return State::Lost;
+            return State::End(End::Lost);
         }
 
         if next_head == self.food.pos {
@@ -77,10 +70,14 @@ impl Game {
             self.snake.step(next_head);
         }
 
-        State::Ok
+        if self.snake.body.len() > (self.rect.width() * self.rect.height() / 4) as usize {
+            return State::End(End::Win);
+        }
+
+        State::Playing
     }
 
-    pub fn on_key(&mut self, key: VirtualKeyCode) {
+    pub fn on_key(&mut self, key: KeyCode) {
         self.snake.on_key(key);
     }
 }
@@ -115,14 +112,12 @@ impl Snake {
     fn next_head(&self) -> Point {
         let head = self.body.front().unwrap();
 
-         match self.direction {
+        match self.direction {
             Direction::Up => Point::new(head.x, head.y - 1),
             Direction::Down => Point::new(head.x, head.y + 1),
             Direction::Left => Point::new(head.x - 1, head.y),
             Direction::Right => Point::new(head.x + 1, head.y),
         }
-
-        
     }
 
     fn hit_test(&self, p: &Point) -> bool {
@@ -141,24 +136,24 @@ impl Snake {
         renderer.draw_points(self.body.iter(), color)
     }
 
-    fn on_key(&mut self, key: VirtualKeyCode) {
+    fn on_key(&mut self, key: KeyCode) {
         match key {
-            VirtualKeyCode::Up | VirtualKeyCode::W => {
+            KeyCode::ArrowUp | KeyCode::KeyW => {
                 if self.direction != Direction::Down {
                     self.direction = Direction::Up;
                 }
             }
-            VirtualKeyCode::Down | VirtualKeyCode::S => {
+            KeyCode::ArrowDown | KeyCode::KeyS => {
                 if self.direction != Direction::Up {
                     self.direction = Direction::Down;
                 }
             }
-            VirtualKeyCode::Left | VirtualKeyCode::A => {
+            KeyCode::ArrowLeft | KeyCode::KeyA => {
                 if self.direction != Direction::Right {
                     self.direction = Direction::Left;
                 }
             }
-            VirtualKeyCode::Right | VirtualKeyCode::D => {
+            KeyCode::ArrowRight | KeyCode::KeyD => {
                 if self.direction != Direction::Left {
                     self.direction = Direction::Right;
                 }
@@ -176,22 +171,6 @@ enum Direction {
     Right = 0x11,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Point {
-    pub x: i32,
-    pub y: i32,
-}
-
-impl Point {
-    fn new(x: i32, y: i32) -> Self {
-        Point { x, y }
-    }
-
-    fn is_same(&self, other: &Point) -> bool {
-        self.x == other.x && self.y == other.y
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 struct Food {
     pos: Point,
@@ -205,16 +184,5 @@ impl Food {
     fn render(&self, renderer: &mut impl Renderer) {
         let color = Color::from_rgba8(200, 32, 32, 255);
         renderer.draw_points([self.pos].iter(), color)
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-struct Size {
-    w: i32,
-    h: i32,
-}
-impl Size {
-    fn new(w: i32, h: i32) -> Size {
-        Size { w, h }
     }
 }
