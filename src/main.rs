@@ -4,7 +4,7 @@ mod renderer;
 
 use std::num::NonZeroU32;
 use std::rc::Rc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use softbuffer::Surface;
 use winit::dpi::PhysicalSize;
@@ -15,9 +15,9 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use crate::game::Game;
 use crate::renderer::{Renderer, SkiaRenderer};
 
-const WIDTH: i32 = 128;
-const HEIGHT: i32 = 128;
-const TIKC_DT: f32 = 1.0 / 10.0;
+const WIDTH: i32 = 32;
+const HEIGHT: i32 = 32;
+const TIKC_DT: f32 = 1.0 / 2.0;
 
 use winit::application::ApplicationHandler;
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
@@ -30,6 +30,7 @@ struct Context {
     frame_buffer: Vec<u32>,
     game: Game,
     ticker: Instant,
+    key_events: Vec<KeyCode>,
 }
 
 #[derive(Default)]
@@ -39,35 +40,43 @@ struct App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.context.is_some() {
+            return;
+        }
+
+        let mut game = Game::new(WIDTH, HEIGHT);
+
+        game.init();
+
         let attr = Window::default_attributes()
             .with_title("Rust Snake")
-            .with_resizable(false);
+            .with_resizable(true);
 
         let window = event_loop.create_window(attr).unwrap();
 
-        let scale = window.scale_factor() * 10.0;
+        let scale = window.scale_factor() * 16.0;
 
         let width = (WIDTH as f64 * scale) as u32;
         let height = (HEIGHT as f64 * scale) as u32;
 
         let inner_size = PhysicalSize::new(width, height);
 
-        window.set_min_inner_size(Some(inner_size));
+        window.request_inner_size(inner_size);
 
         let window = Rc::new(window);
 
         let context = softbuffer::Context::new(window.clone()).unwrap();
         let surface = softbuffer::Surface::new(&context, window.clone()).unwrap();
 
-        let mut game = Game::new(width as i32, height as i32);
-
-        game.init();
+        println!("width: {width}, height: {height}, scale: {scale}");
 
         let mut renderer = SkiaRenderer::new(width, height, scale as f32);
 
         let mut frame_buffer = vec![0; (width * height) as usize];
 
         let mut ticker = Instant::now();
+
+        let mut key_events: Vec<KeyCode> = Vec::new();
 
         let context = Context {
             window,
@@ -76,12 +85,15 @@ impl ApplicationHandler for App {
             frame_buffer,
             game,
             ticker,
+            key_events,
         };
 
         self.context = Some(context);
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
+        let mut cx = self.context.as_mut().unwrap();
+
         match event {
             WindowEvent::CloseRequested => {
                 println!("The close button was pressed; stopping");
@@ -96,14 +108,13 @@ impl ApplicationHandler for App {
 
                 // Draw.
 
-                let mut cx = self.context.as_mut().unwrap();
-
-                cx.renderer.clear();
-
                 let (width, height) = {
                     let size = cx.window.inner_size();
                     (size.width, size.height)
                 };
+
+                cx.renderer.clear();
+
                 cx.game.render(&mut cx.renderer);
 
                 cx.renderer.render(&mut cx.frame_buffer);
@@ -139,7 +150,7 @@ impl ApplicationHandler for App {
                     match key {
                         KeyCode::KeyQ | KeyCode::Escape => event_loop.exit(),
                         _ => {
-                            // key_events.push(key);
+                            cx.key_events.push(key);
                         }
                     }
                 }
@@ -152,6 +163,12 @@ impl ApplicationHandler for App {
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         let mut cx = self.context.as_mut().unwrap();
 
+        for key in cx.key_events.iter() {
+            cx.game.on_key(*key);
+        }
+
+        cx.key_events.clear();
+
         let elapsed = cx.ticker.elapsed().as_secs_f32();
 
         if elapsed >= TIKC_DT {
@@ -159,6 +176,10 @@ impl ApplicationHandler for App {
             cx.ticker = Instant::now();
             cx.window.request_redraw();
         }
+    }
+
+    fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        self.context.take();
     }
 }
 

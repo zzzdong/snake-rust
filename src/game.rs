@@ -133,7 +133,7 @@ impl Snake {
     fn render(&self, renderer: &mut impl Renderer) {
         let color = Color::from_rgba8(32, 200, 32, 255);
 
-        renderer.draw_points(self.body.iter(), color)
+        renderer.draw_points(self.body.iter(), color);
     }
 
     fn on_key(&mut self, key: KeyCode) {

@@ -61,9 +61,10 @@ impl Renderer for SkiaRenderer {
         //     buffer[i] = b;
         // }
 
-        // RRGGBBAA -> 00RRGGBB
+        // RGBA -> 0RGB
         for (i, p) in self.pixmap.data().chunks(4).enumerate() {
-            let b: u32 = ((p[0] as u32) << 16) | ((p[1] as u32) << 8) | (p[2] as u32);
+            // let b: u32 = ((p[0] as u32) << 16) | ((p[1] as u32) << 8) | (p[2] as u32);
+            let b: u32 = u32::from_be_bytes([0, p[0], p[1], p[2]]);
             buffer[i] = b;
         }
 
